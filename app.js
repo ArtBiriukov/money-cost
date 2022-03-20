@@ -3,60 +3,116 @@
 //Переменные
 const listEl = document.querySelector('.list'),
   headerApp = document.querySelector('.header'),
-  URL = 'https://www.cbr-xml-daily.ru/daily_json.js';
+  mainUrl = 'https://www.cbr-xml-daily.ru/daily_json.js';
 
-let iterator = 1,
-  arrObj = [];
+let arrObj = [];
 
-const nextInfo = async (nextInfoUrl) => {
-  let response = await fetch(nextInfoUrl);
+const takeData = async (url) => {
+  let response = await fetch(url);
   let result = await response.json();
   return result;
 }
 
-const makeInformEl = (element, infoItem) => {
-  body.insertAdjacentHTML('beforeend', `
-      <div class="inform">
-  <h3 class="inform__title">Валюта<h3>
-        <div class="inform__top">
-          <p class="data">222222</p>
-          <p class="valute">12331</p>
-        </div>
-        <div class="inform__conten">
-          <p class="data">222222</p>
-          <p class="valute">12331</p>
-        </div>
-      </div>`)
-  console.log(infoItem);
+//Создаем элемент информации за 10 дней
+const creatInform = (element, titleValute) => {
+
+  let infoElement = document.createElement('div');
+  infoElement.classList.add('inform');
+
+  element.appendChild(infoElement);
+
+  infoElement.innerHTML = `
+      <h3 class="inform__title">${titleValute}</h3>
+
+      <ul class="inform__content">
+        <li class="inform__item-top inform__decor">
+          <p>Дата</p>
+          <p>Курс</p>
+        </li>
+      </ul>
+      `;
 }
 
+//Работа с одним элементом
 const addAction = () => {
-  const items = document.querySelectorAll('.item');
+  const items = document.querySelectorAll('.item__content');
 
   items.forEach(item => {
-    item.addEventListener('click', () => {
-      //код валюты
-      const itemCode = item.dataset.code;
-      let itemInfo = [];
+    let parentItem = item.parentNode,
+      itemCode = item.dataset.code,
+      itemTitle = item.dataset.title;
+
+    item.addEventListener('click', (e) => {
+
+      const target = e.currentTarget;
+
+      //Проверка на активный класс и на то что есть блок с информацией или нет
+      if (target === item && item.classList.contains('active')) {
+        item.classList.remove('active');
+
+        if (parentItem.querySelector('.inform')) {
+          parentItem.querySelector('.inform').remove();
+        }
+        return;
+      }
+
+      items.forEach(el => {
+        if (el.classList.contains('active')) {
+          el.classList.remove('active');
+          el.parentNode.querySelector('.inform').remove();
+          return;
+        }
+      })
+
+      item.classList.add('active');
+
+      //создание блока с информацией
+      creatInform(parentItem, itemTitle);
+
+      let informElement = parentItem.querySelector('.inform__content');
 
       arrObj.forEach(objectInfo => {
 
-        let itemDate = objectInfo.Date.substr(0, 10),
-          itemObj = objectInfo.Valute;
+        let informDate = objectInfo.Date.substr(0, 10),
+          informValute = objectInfo.Valute;
 
-        for (const key in itemObj) {
+        for (const key in informValute) {
           if (itemCode === key) {
-            itemInfo.push(itemObj[key].Value);
+
+            let informContent = `<li class="inform__item inform__decor">
+                                          <p>${informDate}</p>
+                                          <p>${informValute[key].Value} ₽</p>
+                                       </li>`;
+
+            informElement.insertAdjacentHTML('beforeend', informContent);
           }
         }
       })
 
-      makeInformEl(item, itemInfo);
+    })
 
+    //Показывать подсказку когда мышку навели
+    item.addEventListener('mouseenter', (e) => {
+      let target = e.target;
+      let valuteTitle = target.dataset.title;
+
+      let creatTooltip = document.createElement('div');
+      creatTooltip.classList.add('tooltip');
+      creatTooltip.innerText = valuteTitle;
+
+      parentItem.appendChild(creatTooltip);
+    })
+
+    //Удалять подсказку когда мышку убрали с элемента
+    item.addEventListener('mouseleave', () => {
+      let tooltipElement = document.querySelector('.tooltip');
+
+      tooltipElement.remove();
     })
   })
 }
 
+//Создание элемента
 const creatEl = ({
   CharCode,
   Name,
@@ -64,8 +120,8 @@ const creatEl = ({
   Value
 }) => {
   listEl.insertAdjacentHTML('beforeend', `
-  <li class='item' data-title='${Name}' data-code='${CharCode}'>
-    <div class="list__content decor">
+  <li class='item'>
+    <div class="item__body item__content" data-code='${CharCode}' data-title='${Name}'>
       <p>${CharCode}</p>
       <p><b>${Value} ₽</b></p>
       <p>${(((Value-Previous)/Previous)*100).toFixed(2)}%</p>
@@ -76,61 +132,36 @@ const creatEl = ({
 
 const getInfo = async (url) => {
   try {
-    let response = await fetch(url);
-    let data = await response.json();
-
-    //Значения валют
-    const valute = data.Valute,
-      date = data.Date.substr(0, 10);
-
-    headerApp.innerText = `Курс валют на ${date}`;
+    let data = await takeData(url);
 
     //Предыдущие значения валют
-    let nextUrl = data.PreviousURL;
-    arrObj.push(data);
+    let prevtUrl = data.PreviousURL;
+    //Значения валют
+    const valute = data.Valute;
+
+    //Вывод даты в заголовке
+    headerApp.innerText = `Курс валют на ${data.Date.substr(0, 10)}`;
+
+
+    //Получение массива данных за последние 10 дней
+    for (let i = 1; i <= 10; i++) {
+      data = await takeData(prevtUrl);
+      arrObj.push(data);
+      prevtUrl = data.PreviousURL;
+    }
 
     //Создание элементов на странице
     for (const key in valute) {
-
       const element = valute[key];
-
       //Функция создания элемента
       creatEl(element);
     }
 
     //Навешивание клика
     addAction();
-
-    //Получение массива данных за последние 10 дней
-
-    for (; iterator < 10; iterator++) {
-      let next = await nextInfo(nextUrl);
-      arrObj.push(next);
-      nextUrl = next.PreviousURL;
-    }
-
   } catch (error) {
     console.warn(error);
   }
 }
 
-getInfo(URL);
-
-
-/* 
-Date: "2022-03-18T11:30:00+03:00"
-PreviousDate: "2022-03-17T11:30:00+03:00"
-PreviousURL: "//www.cbr-xml-daily.ru/archive/2022/03/17/daily_json.js"
-Timestamp: "2022-03-18T15:00:00+03:00"
-Valute: {AUD: {…}, AZN: {…}, GBP: {…}, AMD: {…}, BYN: {…}, …}
-
-
-
-CharCode: "AUD"
-ID: "R01010"
-Name: "Австралийский доллар"
-Nominal: 1
-NumCode: "036"
-Previous: 76.9346
-Value: 76.6025
-*/
+getInfo(mainUrl);
