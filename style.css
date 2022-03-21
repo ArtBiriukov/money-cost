@@ -155,6 +155,23 @@ p {
   background: #ff9800;
 }
 
+.copy {
+  position: fixed;
+  bottom: 30px;
+  left: 5%;
+  background: cornsilk;
+  padding: 10px;
+  border-radius: 10px;
+  text-decoration: none;
+  box-shadow: 0 0 10px 2px rgba(0, 0, 0, 0.5);
+  transition: all 0.5s;
+}
+
+.copy:hover {
+  background: #5f5353;
+  color: #fff;
+}
+
 @keyframes hide {
   0% {
     opacity: 0;
